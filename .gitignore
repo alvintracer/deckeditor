@@ -1,0 +1,4 @@
+node_modules/
+_qa.png
+dist/
+.vercel/
