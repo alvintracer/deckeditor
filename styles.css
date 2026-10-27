@@ -1,3 +1,4 @@
+.folder-button + .folder-button{margin-top:7px}.folder-help{font-size:11px;line-height:1.5;color:#637b8b;margin:9px 0 0}.welcome-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 :root{font-family:Inter,"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;color:#1b2b3d;background:#e9eef4;font-synthesis:none}
 *{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}[hidden]{display:none!important}
 .app{height:100vh;min-height:700px;display:flex;flex-direction:column}

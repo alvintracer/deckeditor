@@ -84,6 +84,56 @@ function discardChanges() {
   return !state.edits.size || confirm('저장하지 않은 수정이 있습니다. 다른 파일을 열면 수정 내용이 사라집니다. 계속할까요?');
 }
 
+function clearOpenedFile() {
+  ++state.loading;
+  state.path = null;
+  state.handle = null;
+  state.html = '';
+  state.segments = [];
+  state.edits.clear();
+  state.validMapping = false;
+  state.channel = null;
+  state.selectedId = null;
+  $('welcome').hidden = false;
+  preview.hidden = true;
+  preview.srcdoc = '';
+  $('previewTitle').textContent = '미리보기';
+  $('previewPath').textContent = 'HTML 파일을 선택하세요';
+  $('editPanel').hidden = true;
+  $('emptyEditor').hidden = false;
+  $('lineList').replaceChildren();
+  $('lineCount').textContent = '';
+  $('slideCount').textContent = '';
+  $('slideSelect').replaceChildren(new Option('HTML 파일을 선택하세요', ''));
+  $('slideSelect').disabled = true;
+  updateSaveStatus();
+}
+
+async function chooseFiles() {
+  if (!window.showOpenFilePicker) {
+    toast('최신 Chrome 또는 Edge에서 HTML 파일 직접 열기를 사용할 수 있습니다.', true);
+    return;
+  }
+  if (!discardChanges()) return;
+  try {
+    const handles = await window.showOpenFilePicker({
+      id: 'deck-editor-html',
+      multiple: true,
+      types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html', '.htm'] } }],
+    });
+    if (!handles.length) return;
+    state.folder = null;
+    state.files = handles.map((handle) => ({ path: handle.name, handle }));
+    clearOpenedFile();
+    $('refreshFiles').disabled = true;
+    $('rootPath').textContent = `직접 선택한 HTML ${state.files.length}개`;
+    renderFiles();
+    await openFile(state.files[0], true);
+  } catch (error) {
+    if (error.name !== 'AbortError') toast(`HTML 파일을 열 수 없습니다: ${error.message}`, true);
+  }
+}
+
 async function chooseFolder() {
   if (!window.showDirectoryPicker) {
     toast('이 기능은 최신 Chrome 또는 Edge의 HTTPS 환경에서 사용할 수 있습니다.', true);
@@ -93,28 +143,12 @@ async function chooseFolder() {
   try {
     const folder = await window.showDirectoryPicker({ id: 'deck-editor-project', mode: 'readwrite' });
     state.folder = folder;
-    state.path = null;
-    state.handle = null;
-    state.edits.clear();
-    state.validMapping = false;
-    state.channel = null;
-    $('welcome').hidden = false;
-    preview.hidden = true;
-    preview.srcdoc = '';
-    $('previewTitle').textContent = '미리보기';
-    $('previewPath').textContent = 'HTML 파일을 선택하세요';
+    clearOpenedFile();
     $('refreshFiles').disabled = false;
-    $('editPanel').hidden = true;
-    $('emptyEditor').hidden = false;
-    $('lineList').replaceChildren();
-    $('lineCount').textContent = '';
-    $('slideSelect').replaceChildren(new Option('HTML 파일을 선택하세요', ''));
-    $('slideSelect').disabled = true;
-    updateSaveStatus();
     await refreshFiles();
     toast(`${folder.name} 폴더를 열었습니다.`);
   } catch (error) {
-    if (error.name !== 'AbortError') toast(`폴더 선택에 실패했습니다: ${error.message}`, true);
+    if (error.name !== 'AbortError') toast('이 폴더는 브라우저가 차단했을 수 있습니다. HTML 파일 직접 열기나 프로젝트 하위 폴더를 사용하세요.', true);
   }
 }
 
@@ -315,6 +349,10 @@ async function saveFile() {
   if (!state.handle || !state.validMapping || !state.edits.size) return;
   $('saveButton').disabled = true;
   try {
+    if (state.handle.requestPermission) {
+      const permission = await state.handle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') throw new Error('원본 파일 쓰기 권한을 허용해 주세요.');
+    }
     const current = await readFileText(state.handle);
     if (current !== state.html) throw new Error('원본 파일이 다른 프로그램에서 변경됐습니다. 수정 내용을 확인한 뒤 다시 열어주세요.');
     const edits = [...state.edits].map(([id, replacement]) => ({ id, original: state.segments[id].text, replacement }));
@@ -358,6 +396,8 @@ $('slideSelect').addEventListener('change', (event) => {
 $('lineSearch').addEventListener('input', renderLines);
 $('fileSearch').addEventListener('input', renderFiles);
 $('refreshFiles').addEventListener('click', refreshFiles);
+$('chooseFiles').addEventListener('click', chooseFiles);
+$('welcomeChooseFiles').addEventListener('click', chooseFiles);
 $('chooseFolder').addEventListener('click', chooseFolder);
 $('welcomeChooseFolder').addEventListener('click', chooseFolder);
 $('reloadButton').addEventListener('click', () => openFile({ path: state.path, handle: state.handle }, false, state.groupIndex));
